@@ -16,6 +16,7 @@ use aptos_types::{
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
+use aptos_vm_types::resolver::ResourceGroupSize;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -55,7 +56,14 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     // concurrent materialization / output preparation.
     finalized_groups: Vec<
         CachePadded<
-            ExplicitSyncWrapper<Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>>,
+            ExplicitSyncWrapper<
+                Vec<(
+                    T::Key,
+                    T::Value,
+                    Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+                    ResourceGroupSize,
+                )>,
+            >,
         >,
     >,
 
@@ -372,7 +380,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn record_finalized_group(
         &self,
         txn_idx: TxnIndex,
-        finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
+        finalized_groups: Vec<(
+            T::Key,
+            T::Value,
+            Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+            ResourceGroupSize,
+        )>,
     ) {
         *self.finalized_groups[txn_idx as usize].acquire() = finalized_groups;
     }
@@ -380,7 +393,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn take_finalized_group(
         &self,
         txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)> {
+    ) -> Vec<(
+        T::Key,
+        T::Value,
+        Vec<(T::Tag, ValueWithLayout<T::Value>)>,
+        ResourceGroupSize,
+    )> {
         std::mem::take(&mut self.finalized_groups[txn_idx as usize].acquire())
     }
 
