@@ -179,9 +179,9 @@ impl Loc {
 
     /// Creates a location which encloses all the locations in the provided slice,
     /// which must not be empty. All locations are expected to be in the same file.
-    pub fn enclosing(locs: &[&Loc]) -> Loc {
+    pub fn enclosing(locs: &[Loc]) -> Loc {
         assert!(!locs.is_empty());
-        let loc = locs[0];
+        let loc = &locs[0];
         let mut start = loc.span.start();
         let mut end = loc.span.end();
         for l in locs.iter().skip(1) {
@@ -376,6 +376,12 @@ impl NodeId {
 
     pub fn as_usize(self) -> usize {
         self.0
+    }
+}
+
+impl AsRef<NodeId> for NodeId {
+    fn as_ref(&self) -> &NodeId {
+        self
     }
 }
 
