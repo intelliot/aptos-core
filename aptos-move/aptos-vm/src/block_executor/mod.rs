@@ -20,7 +20,7 @@ use aptos_infallible::Mutex;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
-    delayed_fields::PanicError,
+    error::PanicError,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},

@@ -13,11 +13,10 @@ use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{serialize, DeltaOp},
     resolver::AggregatorV1Resolver,
-    types::code_invariant_error,
 };
 use aptos_types::{
     contract_event::ContractEvent,
-    delayed_fields::PanicError,
+    error::{code_invariant_error, PanicError},
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         state_value::StateValueMetadata,

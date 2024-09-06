@@ -19,10 +19,7 @@ use aptos_aggregator::{
     delta_change_set::serialize,
     delta_math::DeltaHistory,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{
-        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        ReadPosition,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{
@@ -36,7 +33,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    delayed_fields::PanicError,
+    error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::{Executable, ModulePath},
     state_store::{
         errors::StateviewError,
@@ -1759,7 +1756,7 @@ mod test {
     use aptos_aggregator::{
         bounded_math::{BoundedMath, SignedU128},
         delta_math::DeltaHistory,
-        types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr, ReadPosition},
+        types::{DelayedFieldValue, DelayedFieldsSpeculativeError, ReadPosition},
     };
     use aptos_mvhashmap::{
         types::{MVDelayedFieldsError, TxnIndex},
@@ -1768,6 +1765,7 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
+        error::PanicOr,
         executable::Executable,
         state_store::{
             errors::StateviewError, state_storage_usage::StateStorageUsage,

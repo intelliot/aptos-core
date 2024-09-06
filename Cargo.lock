@@ -403,7 +403,6 @@ dependencies = [
 name = "aptos-aggregator"
 version = "0.1.0"
 dependencies = [
- "aptos-logger",
  "aptos-types",
  "bcs 0.1.4",
  "claims",
@@ -4329,6 +4328,7 @@ dependencies = [
  "strum_macros 0.24.3",
  "thiserror",
  "tokio",
+ "tracing",
  "url",
 ]
 

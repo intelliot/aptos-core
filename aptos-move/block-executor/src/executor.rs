@@ -22,7 +22,6 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
     delta_change_set::serialize,
-    types::{code_invariant_error, expect_ok, PanicOr},
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
@@ -34,7 +33,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
-    delayed_fields::PanicError,
+    error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
@@ -786,16 +785,13 @@ where
         };
 
         loop {
-            if let SchedulerTask::ValidationTask(_, incarnation, _) = &scheduler_task {
-                if *incarnation as usize > num_txns + 10 {
+            if let SchedulerTask::ValidationTask(txn_idx, incarnation, _) = &scheduler_task {
+                if *incarnation as usize > num_workers.pow(2) + num_txns + 10 {
                     // Something is wrong if we observe high incarnations (e.g. a bug
-                    // might manifest as an execution-invalidation cycle). Break out with
-                    // an error to fallback to sequential execution.
-                    return Err(code_invariant_error(format!(
-                        "BlockSTM: too high incarnation {}, block len {}",
-                        *incarnation, num_txns,
-                    ))
-                    .into());
+                    // might manifest as an execution-invalidation cycle). Break out
+                    // to fallback to sequential execution.
+                    error!("Observed incarnation {} of txn {txn_idx}", *incarnation);
+                    return Err(PanicOr::Or(ParallelBlockExecutionError::IncarnationTooHigh));
                 }
             }
 

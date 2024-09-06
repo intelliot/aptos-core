@@ -22,7 +22,8 @@ use aptos_aggregator::{
     delta_change_set::DeltaWithMax,
 };
 use aptos_types::{
-    delayed_fields::{PanicError, SnapshotToStringFormula},
+    delayed_fields::SnapshotToStringFormula,
+    error::PanicError,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},
