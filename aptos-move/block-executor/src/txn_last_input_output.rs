@@ -10,13 +10,12 @@ use crate::{
 };
 use aptos_aggregator::types::code_invariant_error;
 use aptos_logger::error;
-use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
+use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     delayed_fields::PanicError, fee_statement::FeeStatement,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
-use aptos_vm_types::resolver::ResourceGroupSize;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
 use dashmap::DashSet;
@@ -44,28 +43,15 @@ macro_rules! forward_on_success_or_skip_rest {
     }};
 }
 
-pub(crate) enum KeyKind {
+pub(crate) enum KeyKind<T> {
     Resource,
     Module,
-    Group,
+    // Contains the set of tags for the given group key.
+    Group(HashSet<T>),
 }
 
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
-    // Set once when the group outputs are committed sequentially, to be processed later by
-    // concurrent materialization / output preparation.
-    finalized_groups: Vec<
-        CachePadded<
-            ExplicitSyncWrapper<
-                Vec<(
-                    T::Key,
-                    T::Value,
-                    Vec<(T::Tag, ValueWithLayout<T::Value>)>,
-                    ResourceGroupSize,
-                )>,
-            >,
-        >,
-    >,
 
     // TODO: Consider breaking down the outputs when storing (avoid traversals, cache below).
     outputs: Vec<CachePadded<ArcSwapOption<ExecutionStatus<O, E>>>>, // txn_idx -> output.
@@ -75,6 +61,8 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     arced_resource_writes: Vec<
         CachePadded<ExplicitSyncWrapper<Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>>>,
     >,
+    resource_group_keys_and_tags:
+        Vec<CachePadded<ExplicitSyncWrapper<Vec<(T::Key, HashSet<T::Tag>)>>>>,
 
     // Record all writes and reads to access paths corresponding to modules (code) in any
     // (speculative) executions. Used to avoid a potential race with module publishing and
@@ -97,9 +85,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             arced_resource_writes: (0..num_txns)
                 .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
                 .collect(),
-            finalized_groups: (0..num_txns)
+            resource_group_keys_and_tags: (0..num_txns)
                 .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
                 .collect(),
+
             module_writes: DashSet::new(),
             module_reads: DashSet::new(),
         }
@@ -139,6 +128,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         input: CapturedReads<T>,
         output: ExecutionStatus<O, E>,
         arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
+        group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)>,
     ) -> bool {
         let written_modules = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -156,6 +146,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         }
 
         *self.arced_resource_writes[txn_idx as usize].acquire() = arced_resource_writes;
+        *self.resource_group_keys_and_tags[txn_idx as usize].acquire() = group_keys_and_tags;
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
 
@@ -279,10 +270,22 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     // Extracts a set of paths (keys) written or updated during execution from transaction
     // output, .1 for each item is false for non-module paths and true for module paths.
+    // If take_group_tags is set, the HashSet of tags is returned for each group key -
+    // should be called once for each incarnation / record due to 'take'. if take_group_tags
+    // is false, no tags (empty HashSet) is returned.
     pub(crate) fn modified_keys(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<impl Iterator<Item = (T::Key, KeyKind)>> {
+        take_group_tags: bool,
+    ) -> Option<impl Iterator<Item = (T::Key, KeyKind<T::Tag>)>> {
+        let group_keys_and_tags: Vec<(T::Key, HashSet<T::Tag>)> = if take_group_tags {
+            std::mem::take(&mut self.resource_group_keys_and_tags[txn_idx as usize].acquire())
+        } else {
+            self.resource_group_keys_and_tags[txn_idx as usize]
+                .acquire()
+                .clone()
+        };
+
         self.outputs[txn_idx as usize]
             .load_full()
             .and_then(|txn_output| match txn_output.as_ref() {
@@ -304,9 +307,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                                 .map(|k| (k, KeyKind::Module)),
                         )
                         .chain(
-                            t.resource_group_metadata_ops()
+                            group_keys_and_tags
                                 .into_iter()
-                                .map(|(k, _)| (k, KeyKind::Group)),
+                                .map(|(k, tags)| (k, KeyKind::Group(tags))),
                         ),
                 ),
                 ExecutionStatus::Abort(_)
@@ -375,31 +378,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 },
             },
         )
-    }
-
-    pub(crate) fn record_finalized_group(
-        &self,
-        txn_idx: TxnIndex,
-        finalized_groups: Vec<(
-            T::Key,
-            T::Value,
-            Vec<(T::Tag, ValueWithLayout<T::Value>)>,
-            ResourceGroupSize,
-        )>,
-    ) {
-        *self.finalized_groups[txn_idx as usize].acquire() = finalized_groups;
-    }
-
-    pub(crate) fn take_finalized_group(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Vec<(
-        T::Key,
-        T::Value,
-        Vec<(T::Tag, ValueWithLayout<T::Value>)>,
-        ResourceGroupSize,
-    )> {
-        std::mem::take(&mut self.finalized_groups[txn_idx as usize].acquire())
     }
 
     pub(crate) fn take_resource_write_set(

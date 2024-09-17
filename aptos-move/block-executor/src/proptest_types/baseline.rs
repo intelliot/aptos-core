@@ -265,6 +265,15 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 group_read_results.into_iter()
             )
             .for_each(|(result_group_read, baseline_group_read)| {
+                let a = result_group_read.clone().map(Into::<Bytes>::into);
+                if a != baseline_group_read {
+                    println!(
+                        "{:?}, {:?} {}",
+                        a,
+                        baseline_group_read.clone(),
+                        baseline_group_read.clone().unwrap().len()
+                    );
+                }
                 assert!(result_group_read.clone().map(Into::<Bytes>::into) == baseline_group_read);
             });
 

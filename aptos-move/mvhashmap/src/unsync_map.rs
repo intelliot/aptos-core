@@ -227,11 +227,12 @@ impl<
                 entry.insert(ValueWithLayout::Exchanged(Arc::new(v), maybe_layout));
             },
             (l, r) => {
-                println!("WriteOp kind {:?} not consistent with previous value at tag {:?}. l: {:?}, r: {:?}", v.write_op_kind(), value_tag, l, r);
                 return Err(code_invariant_error(format!(
-                    "WriteOp kind {:?} not consistent with previous value at tag {:?}",
+                    "WriteOp kind {:?} not consistent with previous value at tag {:?}. Existing: {:?}, new: {:?}",
                     v.write_op_kind(),
-                    value_tag
+                    value_tag,
+		    l,
+		    r,
                 )));
             },
         }

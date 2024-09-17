@@ -1056,7 +1056,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
     pub fn is_incorrect_use(&self) -> bool {
         match &self.latest_view {
-            ViewState::Sync(state) => state.captured_reads.borrow().is_incorrect_use(),
+            ViewState::Sync(_) => {
+                // Parallel executor accesses captured reads directly and does not use this API.
+                true
+            },
             ViewState::Unsync(state) => *state.incorrect_use.borrow(),
         }
     }

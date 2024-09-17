@@ -32,8 +32,8 @@ pub type Version = Result<(TxnIndex, Incarnation), StorageVersion>;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum Flag {
-    Done,
-    Estimate,
+    Done = 0,
+    Estimate = 1,
 }
 
 #[derive(Debug, Derivative)]
@@ -81,14 +81,25 @@ impl GroupReadResult {
     pub fn into_value(self) -> (Option<Bytes>, Option<Arc<MoveTypeLayout>>) {
         match self {
             GroupReadResult::Value(maybe_bytes, maybe_layout) => (maybe_bytes, maybe_layout),
-            _ => unreachable!("Expected a value"),
+            GroupReadResult::Size(size) => {
+                unreachable!("Expected group value, found size {:?}", size)
+            },
+            GroupReadResult::Uninitialized => {
+                unreachable!("Expected group value, found uninitialized")
+            },
         }
     }
 
     pub fn into_size(self) -> ResourceGroupSize {
         match self {
             GroupReadResult::Size(size) => size,
-            _ => unreachable!("Expected size"),
+            GroupReadResult::Value(maybe_bytes, maybe_layout) => unreachable!(
+                "Expected size, found value bytes = {:?}, layout = {:?}",
+                maybe_bytes, maybe_layout
+            ),
+            GroupReadResult::Uninitialized => {
+                unreachable!("Expected group size, found uninitialized")
+            },
         }
     }
 }
