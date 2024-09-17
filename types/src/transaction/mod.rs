@@ -1059,7 +1059,6 @@ impl TransactionStatus {
         charge_invariant_violation: bool,
         features: &Features,
     ) -> (Self, TransactionAuxiliaryData) {
-        println!("{:?}", vm_status);
         let status_code = vm_status.status_code();
         let txn_aux = TransactionAuxiliaryData::from_vm_status(&vm_status);
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
