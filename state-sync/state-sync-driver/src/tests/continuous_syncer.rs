@@ -165,7 +165,7 @@ async fn test_data_stream_transactions_with_target() {
 
     // Drive progress to initialize the transaction output stream
     let (sync_target_notification, _) = ConsensusSyncTargetNotification::new(target_ledger_info);
-    let sync_request = Arc::new(Mutex::new(Some(ConsensusSyncRequest::new(
+    let sync_request = Arc::new(Mutex::new(Some(ConsensusSyncRequest::new_with_target(
         sync_target_notification,
     ))));
     drive_progress(&mut continuous_syncer, &sync_request).await;
@@ -325,7 +325,7 @@ async fn test_data_stream_transactions_or_outputs_with_target() {
 
     // Drive progress to initialize the transaction output stream
     let (sync_target_notification, _) = ConsensusSyncTargetNotification::new(target_ledger_info);
-    let sync_request = Arc::new(Mutex::new(Some(ConsensusSyncRequest::new(
+    let sync_request = Arc::new(Mutex::new(Some(ConsensusSyncRequest::new_with_target(
         sync_target_notification,
     ))));
     drive_progress(&mut continuous_syncer, &sync_request).await;
@@ -445,7 +445,7 @@ async fn test_data_stream_transactions_or_outputs_with_target_fallback() {
 
     // Drive progress to initialize the transactions or output stream
     let (sync_target_notification, _) = ConsensusSyncTargetNotification::new(target_ledger_info);
-    let sync_request = Arc::new(Mutex::new(Some(ConsensusSyncRequest::new(
+    let sync_request = Arc::new(Mutex::new(Some(ConsensusSyncRequest::new_with_target(
         sync_target_notification,
     ))));
     drive_progress(&mut continuous_syncer, &sync_request).await;
