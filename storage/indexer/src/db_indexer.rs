@@ -407,6 +407,7 @@ impl DBIndexer {
             version += 1;
             Ok::<(), AptosDbError>(())
         })?;
+        assert!(version > 0, "batch number should be greater than 0");
         assert_eq!(num_transactions, version - start_version);
         if self.indexer_db.transaction_enabled() {
             batch.put::<InternalIndexerMetadataSchema>(

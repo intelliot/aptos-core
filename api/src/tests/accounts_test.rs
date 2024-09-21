@@ -33,7 +33,7 @@ async fn test_get_account_resources_by_address_0x0() {
     context.check_golden_output(resp);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 3)]
 async fn test_get_account_resources_by_valid_account_address() {
     let context = new_test_context(current_function_name!());
     let addresses = vec!["0x1", "0x00000000000000000000000000000001"];
@@ -144,6 +144,9 @@ async fn test_account_resources_by_ledger_version_with_context(mut context: Test
 async fn test_get_account_resources_by_ledger_version() {
     let context = new_test_context(current_function_name!());
     test_account_resources_by_ledger_version_with_context(context).await;
+}
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_account_resources_by_ledger_version_with_shard_context() {
     let shard_context =
         new_test_context_with_db_sharding_and_internal_indexer(current_function_name!());
     test_account_resources_by_ledger_version_with_context(shard_context).await;
