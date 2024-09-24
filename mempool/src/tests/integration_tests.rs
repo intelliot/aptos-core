@@ -319,6 +319,27 @@ async fn test_rebroadcast_retry_is_empty() {
         .await;
 }
 
+/// The retry broadcast can become empty due to commits. The next broadcast should ignore this empty broadcast.
+#[tokio::test]
+async fn test_get_all_addresses_from_parking_lot() {
+    let mut node = MempoolTestFrameworkBuilder::single_validator();
+
+    // Add second txn. Using TXN_2 here because sequence number needs to be higher than expected
+    // to be put in parking lot
+    node.add_txns_via_client(&TXN_2).await;
+
+    // TODO @hariria `node.assert_txns_in_mempool` doesn't seem to check parking_lot, only mempool
+    // TODO Maybe we should change it or create an assertion for parking lot
+    // node.assert_txns_in_mempool(&TXN_2);
+
+    // Check to make sure transaction is in parking lot
+    let addresses = node.get_parking_lot_txns_via_client().await;
+    assert_eq!(
+        addresses.first().unwrap().to_string(),
+        TXN_2.first().unwrap().address.to_string()
+    );
+}
+
 // -- Multi node tests below here --
 
 /// Tests if the node is a VFN, and it's getting forwarded messages from a PFN.  It should forward
