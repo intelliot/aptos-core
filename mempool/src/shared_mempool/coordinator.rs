@@ -217,6 +217,28 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
                 ))
                 .await;
         },
+        MempoolClientRequest::GetAddressesFromParkingLot((), callback) => {
+            // This timer measures how long it took for the bounded executor to *schedule* the
+            // task.
+            let _timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_GET_PARKING_LOT_ADDRESSES,
+                counters::SPAWN_LABEL,
+            );
+            // This timer measures how long it took for the task to go from scheduled to started.
+            let task_start_timer = counters::task_spawn_latency_timer(
+                counters::CLIENT_EVENT_GET_PARKING_LOT_ADDRESSES,
+                counters::START_LABEL,
+            );
+            smp.network_interface
+                .num_mempool_txns_received_since_peers_updated += 1;
+            bounded_executor
+                .spawn(tasks::process_parking_lot_addresses(
+                    smp.clone(),
+                    callback,
+                    task_start_timer,
+                ))
+                .await;
+        },
     }
 }
 

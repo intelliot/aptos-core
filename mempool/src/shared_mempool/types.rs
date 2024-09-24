@@ -237,6 +237,7 @@ pub type SubmissionStatusBundle = (SignedTransaction, SubmissionStatus);
 pub enum MempoolClientRequest {
     SubmitTransaction(SignedTransaction, oneshot::Sender<Result<SubmissionStatus>>),
     GetTransactionByHash(HashValue, oneshot::Sender<Option<SignedTransaction>>),
+    GetAddressesFromParkingLot((), oneshot::Sender<Vec<String>>),
 }
 
 pub type MempoolClientSender = mpsc::Sender<MempoolClientRequest>;

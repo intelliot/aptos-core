@@ -122,8 +122,6 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation + 'static,
 {
-    timer.stop_and_record();
-    let _timer = counters::process_txn_submit_latency_timer_client();
     let ineligible_for_broadcast =
         smp.network_interface.is_validator() && !smp.broadcast_within_validator_network();
     let timeline_state = if ineligible_for_broadcast {
@@ -138,6 +136,10 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
             timeline_state,
             true,
         );
+
+    // TODO @hariria is it just me or should this be moved to here?
+    timer.stop_and_record();
+    let _timer = counters::process_txn_submit_latency_timer_client();
     log_txn_process_results(&statuses, None);
 
     if let Some(status) = statuses.first() {
@@ -148,6 +150,30 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
             ));
             counters::CLIENT_CALLBACK_FAIL.inc();
         }
+    }
+}
+
+/// Processes request for all addresses in parking lot
+pub(crate) async fn process_parking_lot_addresses<NetworkClient, TransactionValidator>(
+    smp: SharedMempool<NetworkClient, TransactionValidator>,
+    callback: oneshot::Sender<Vec<String>>,
+    timer: HistogramTimer,
+) where
+    NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
+    TransactionValidator: TransactionValidation + 'static,
+{
+    // TODO @hariria check if locking semantics are OK here
+    let addresses = smp.mempool.lock().get_parking_lot_addresses();
+
+    //TODO @hariria check timer location
+    timer.stop_and_record();
+    let _timer = counters::process_txn_submit_latency_timer_client();
+    if callback.send(addresses).is_err() {
+        warn!(LogSchema::event_log(
+            LogEntry::JsonRpc,
+            LogEvent::CallbackFail
+        ));
+        counters::CLIENT_CALLBACK_FAIL.inc();
     }
 }
 
