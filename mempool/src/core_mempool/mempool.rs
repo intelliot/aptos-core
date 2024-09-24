@@ -597,4 +597,8 @@ impl Mempool {
     pub fn get_transaction_store(&self) -> &TransactionStore {
         &self.transactions
     }
+
+    pub fn get_parking_lot_addresses(&self) -> Vec<String> {
+        self.transactions.get_parking_lot_addresses()
+    }
 }

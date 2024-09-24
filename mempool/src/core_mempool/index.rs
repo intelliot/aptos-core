@@ -513,6 +513,10 @@ impl ParkingLotIndex {
     pub(crate) fn size(&self) -> usize {
         self.size
     }
+
+    pub(crate) fn get_addresses(&self) -> Vec<String> {
+        self.data.iter().map(|(addr, _)| addr.to_string()).collect()
+    }
 }
 
 /// Logical pointer to `MempoolTransaction`.

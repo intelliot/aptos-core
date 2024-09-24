@@ -916,4 +916,8 @@ impl TransactionStore {
     pub(crate) fn get_transactions(&self) -> &HashMap<AccountAddress, AccountTransactions> {
         &self.transactions
     }
+
+    pub(crate) fn get_parking_lot_addresses(&self) -> Vec<String> {
+        self.parking_lot_index.get_addresses()
+    }
 }
