@@ -15,7 +15,7 @@ pub struct PipelineExecutionResult {
     pub result: StateComputeResult,
     pub execution_time: Duration,
     #[derivative(Debug = "ignore")]
-    pub pre_commit_fut: SyncBoxFuture<'static, ExecutorResult<()>>,
+    pub pre_commit_fut: Option<SyncBoxFuture<'static, ExecutorResult<()>>>,
 }
 
 impl PipelineExecutionResult {
@@ -23,7 +23,7 @@ impl PipelineExecutionResult {
         input_txns: Vec<SignedTransaction>,
         result: StateComputeResult,
         execution_time: Duration,
-        pre_commit_fut: SyncBoxFuture<'static, ExecutorResult<()>>,
+        pre_commit_fut: Option<SyncBoxFuture<'static, ExecutorResult<()>>>,
     ) -> Self {
         Self {
             input_txns,

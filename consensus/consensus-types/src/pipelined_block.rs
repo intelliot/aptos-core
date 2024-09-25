@@ -127,6 +127,7 @@ impl PipelinedBlock {
 
         self.state_compute_result = result;
         self.input_transactions = input_txns;
+        let pre_commit_fut = pre_commit_fut.expect("pre_commit_fut missing.");
         self.pre_commit_fut = Arc::new(Mutex::new(Some(pre_commit_fut)));
 
         let mut to_commit = 0;

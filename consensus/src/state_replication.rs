@@ -4,7 +4,7 @@
 
 use crate::{
     error::StateSyncError, payload_manager::TPayloadManager,
-    pipeline::pipeline_phase::CountedRequest, state_computer::{StateComputeResultFut, SyncStateComputeResultFut},
+    pipeline::{pipeline_phase::CountedRequest, pre_execution_phase::ExecutionType}, state_computer::{StateComputeResultFut, SyncStateComputeResultFut},
     transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
@@ -34,6 +34,7 @@ pub trait StateComputer: Send + Sync {
         _parent_block_id: HashValue,
         _randomness: Option<Randomness>,
         _lifetime_guard: CountedRequest<()>,
+        execution_type: ExecutionType,
     ) -> SyncStateComputeResultFut {
         unimplemented!();
     }

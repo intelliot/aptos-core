@@ -10,7 +10,7 @@ use crate::{
     execution_pipeline::ExecutionPipeline,
     monitor,
     payload_manager::TPayloadManager,
-    pipeline::pipeline_phase::CountedRequest,
+    pipeline::{pipeline_phase::CountedRequest, pre_execution_phase::ExecutionType},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     transaction_deduper::TransactionDeduper,
     transaction_filter::TransactionFilter,
@@ -162,6 +162,7 @@ impl StateComputer for ExecutionProxy {
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
         lifetime_guard: CountedRequest<()>,
+        execution_type: ExecutionType,
     ) -> SyncStateComputeResultFut {
         let block_id = block.id();
         debug!(
@@ -210,6 +211,7 @@ impl StateComputer for ExecutionProxy {
                 transaction_generator,
                 block_executor_onchain_config,
                 lifetime_guard,
+                execution_type,
             )
             .await;
         observe_block(timestamp, BlockStage::EXECUTION_PIPELINE_INSERTED);

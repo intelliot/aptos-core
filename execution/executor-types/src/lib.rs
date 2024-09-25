@@ -50,6 +50,11 @@ mod ledger_update_output;
 pub mod parsed_transaction_output;
 pub mod state_checkpoint_output;
 
+pub enum PipelineExecutionStatus {
+    Executed,
+    NewExecution(StateCheckpointOutput),
+}
+
 pub trait ChunkExecutorTrait: Send + Sync {
     /// Verifies the transactions based on the provided proofs and ledger info. If the transactions
     /// are valid, executes them and returns the executed result for commit.
@@ -154,13 +159,13 @@ pub trait BlockExecutorTrait: Send + Sync {
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput>;
+    ) -> ExecutorResult<PipelineExecutionStatus>;
 
     fn ledger_update(
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
+        pipeline_execution_status: PipelineExecutionStatus,
     ) -> ExecutorResult<StateComputeResult>;
 
     #[cfg(any(test, feature = "fuzzing"))]

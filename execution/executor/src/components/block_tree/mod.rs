@@ -295,6 +295,10 @@ impl BlockTree {
             .fetch_or_add_block(id, output, Some(parent_block_id))
     }
 
+    pub fn exist_block(&self, id: HashValue) -> bool {
+        self.block_lookup.inner.lock().0.contains_key(&id)
+    }
+
     pub fn root_block(&self) -> Arc<Block> {
         self.root.lock().clone()
     }

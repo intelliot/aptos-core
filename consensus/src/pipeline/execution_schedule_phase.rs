@@ -4,7 +4,7 @@
 use crate::{
     counters::{NUM_NON_PREEXECUTED_BLOCKS, NUM_PREEXECUTED_BLOCKS, NUM_RE_EXECUTED_BLOCKS}, pipeline::{
         execution_wait_phase::ExecutionWaitRequest,
-        pipeline_phase::{CountedRequest, StatelessPipeline},
+        pipeline_phase::{CountedRequest, StatelessPipeline}, pre_execution_phase::ExecutionType,
     }, state_computer::{StateComputeResultFut, SyncStateComputeResultFut}, state_replication::StateComputer
 };
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
@@ -90,7 +90,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                     info!("[PreExecution] block was not pre-executed, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
                     let fut = self
                         .execution_proxy
-                        .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()))
+                        .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()), ExecutionType::Execution)
                         .await;
                     entry.insert(fut);
                     NUM_NON_PREEXECUTED_BLOCKS.inc();
@@ -112,14 +112,25 @@ impl StatelessPipeline for ExecutionSchedulePhase {
                     dashmap::mapref::entry::Entry::Occupied(mut entry) => {
                         let fut = entry.get().clone();
                         let result = match fut.await {
-                            Ok(result) => Ok(result),
+                            Ok(result) => {
+                                if result.pre_commit_fut.is_some() {
+                                    Ok(result)
+                                } else {
+                                    info!("[PreExecution] pre-executed block forward to pre-commit, epoch {} round {} id {}", block.epoch(), block.round(), block.id());
+                                    let fut = execution_proxy
+                                        .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()), ExecutionType::Execution)
+                                        .await;
+                                    entry.insert(fut.clone());
+                                    fut.await
+                                }
+                            },
                             Err(e) => {
-                                info!("[Execution] block is re-executed due to error {:?}, epoch {} round {} id {}", e, block.epoch(), block.round(), block.id());
+                                info!("[PreExecution] block is re-executed due to error {:?}, epoch {} round {} id {}", e, block.epoch(), block.round(), block.id());
+                                NUM_RE_EXECUTED_BLOCKS.inc();
                                 let fut = execution_proxy
-                                    .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()))
+                                    .schedule_compute(block.block(), block.parent_id(), block.randomness().cloned(), lifetime_guard.spawn(()), ExecutionType::Execution)
                                     .await;
                                 entry.insert(fut.clone());
-                                NUM_RE_EXECUTED_BLOCKS.inc();
                                 fut.await
                             }
                         };

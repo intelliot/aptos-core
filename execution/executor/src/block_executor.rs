@@ -17,11 +17,10 @@ use crate::{
         CONCURRENCY_GAUGE,
     },
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
-    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput,
-    BlockExecutorTrait, ExecutorError, ExecutorResult, StateComputeResult,
+    execution_output::ExecutionOutput, state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorError, ExecutorResult, PipelineExecutionStatus, StateComputeResult
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
@@ -120,7 +119,7 @@ where
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput> {
+    ) -> ExecutorResult<PipelineExecutionStatus> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "execute_and_state_checkpoint"]);
 
         self.maybe_initialize()?;
@@ -135,7 +134,7 @@ where
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
+        pipeline_execution_status: PipelineExecutionStatus,
     ) -> ExecutorResult<StateComputeResult> {
         let _guard = CONCURRENCY_GAUGE.concurrency_with(&["block", "ledger_update"]);
 
@@ -144,7 +143,7 @@ where
             .read()
             .as_ref()
             .expect("BlockExecutor is not reset")
-            .ledger_update(block_id, parent_block_id, state_checkpoint_output)
+            .ledger_update(block_id, parent_block_id, pipeline_execution_status)
     }
 
     fn pre_commit_block(
@@ -215,7 +214,15 @@ where
         block: ExecutableBlock,
         parent_block_id: HashValue,
         onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> ExecutorResult<StateCheckpointOutput> {
+    ) -> ExecutorResult<PipelineExecutionStatus> {
+        // Skip execution if block is already pre-executed
+        if self.block_tree.exist_block(block.block_id) {
+            info!(
+                LogSchema::new(LogEntry::BlockExecutor).block_id(block.block_id),
+                "block_already_executed"
+            );
+            return Ok(PipelineExecutionStatus::Executed);
+        }
         let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let ExecutableBlock {
             block_id,
@@ -286,14 +293,14 @@ where
             block_id,
             ExecutionOutput::new(state, epoch_state),
         )?;
-        Ok(state_checkpoint_output)
+        Ok(PipelineExecutionStatus::NewExecution(state_checkpoint_output))
     }
 
     fn ledger_update(
         &self,
         block_id: HashValue,
         parent_block_id: HashValue,
-        state_checkpoint_output: StateCheckpointOutput,
+        pipeline_execution_status: PipelineExecutionStatus,
     ) -> ExecutorResult<StateComputeResult> {
         let _timer = APTOS_EXECUTOR_LEDGER_UPDATE_SECONDS.start_timer();
         info!(
@@ -316,6 +323,10 @@ where
         let current_output = block_vec.pop().expect("Must exist").unwrap();
         parent_block.ensure_has_child(block_id)?;
         if current_output.output.has_ledger_update() {
+            info!(
+                LogSchema::new(LogEntry::BlockExecutor).block_id(block_id),
+                "ledger_update_already_computed"
+            );
             return Ok(current_output
                 .output
                 .get_ledger_update()
@@ -324,6 +335,16 @@ where
                     current_output.output.epoch_state().clone(),
                 ));
         }
+
+        let state_checkpoint_output = match pipeline_execution_status {
+            PipelineExecutionStatus::NewExecution(state_checkpoint_output) => state_checkpoint_output,
+            _ => return Err(ExecutorError::InternalError {
+                    error: format!(
+                        "[PreExecution] error: Block {} is executed but not not ledger updated.",
+                        block_id
+                    ),
+                }),
+        };
 
         let output =
             if parent_block_id != committed_block_id && parent_block.output.has_reconfiguration() {
