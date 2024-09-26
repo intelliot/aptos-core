@@ -451,6 +451,21 @@ fn main() -> Result<()> {
                         "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, &indexer_image_tag),
                         "fullnodeConfig": {
                             "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, &indexer_image_tag),
+                            "cpu": "59",
+                            "memory": "200Gi",
+                            "fullnodeConfigOverride": {
+                                "indexer_table_info": {
+                                  "parser_task_count": 20, // tune this in test
+                                  "parser_batch_size": 1000
+                                },
+                                "storage": {
+                                  "storage_pruner_config": {
+                                    "ledger_pruner_config": {
+                                      "enable": false // disable pruning so we can eliminate potential race with table info
+                                    }
+                                  }
+                                }
+                            }
                         }
                     },
                 }))?;
